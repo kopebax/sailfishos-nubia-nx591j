@@ -1,0 +1,28 @@
+From da6d69529f3f6851195e42b4156d9a6397f5fa90 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 01:41:17 +0100
+Subject: [PATCH] gralloc: declare native_handle_clone() for Android 7 headers
+ (implicit int truncated the pointer on aarch64)
+
+---
+ hybris/gralloc/gralloc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/hybris/gralloc/gralloc.c b/hybris/gralloc/gralloc.c
+index 973b247..9c91049 100644
+--- a/hybris/gralloc/gralloc.c
++++ b/hybris/gralloc/gralloc.c
+@@ -34,6 +34,10 @@
+ #else
+ #include <hybris/gralloc/gralloc.h>
+ #include <hybris/ui/ui.h>
++
++/* Android < 8 cutils/native_handle.h does not declare native_handle_clone();
++ * without a prototype C assumes it returns int and truncates the 64-bit pointer. */
++native_handle_t *native_handle_clone(const native_handle_t *handle);
+ #include <hybris/common/binding.h>
+ #endif
+ 
+-- 
+2.56.0
+

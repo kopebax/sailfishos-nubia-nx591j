@@ -1,0 +1,37 @@
+From 5af9d0a33e16474f77ad51520492357293fda512 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 15:55:57 +0100
+Subject: [PATCH] hybris: compat defines for Android 7 sensors.h
+
+---
+ core/hybrisbackend.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/core/hybrisbackend.h b/core/hybrisbackend.h
+index fd657de..9f99b2d 100644
+--- a/core/hybrisbackend.h
++++ b/core/hybrisbackend.h
+@@ -30,6 +30,20 @@
+ #else
+ #include <hardware/hardware.h>
+ #include <hardware/sensors.h>
++
++/* Android < 8 (hybris-14.1): flags exist under older names or not at all */
++#ifndef SENSOR_FLAG_MASK_REPORTING_MODE
++#define SENSOR_FLAG_MASK_REPORTING_MODE REPORTING_MODE_MASK
++#endif
++#ifndef SENSOR_FLAG_DATA_INJECTION
++#define SENSOR_FLAG_DATA_INJECTION DATA_INJECTION_MASK
++#endif
++#ifndef SENSOR_FLAG_DIRECT_CHANNEL_ASHMEM
++#define SENSOR_FLAG_DIRECT_CHANNEL_ASHMEM 0x400
++#endif
++#ifndef SENSOR_FLAG_DIRECT_CHANNEL_GRALLOC
++#define SENSOR_FLAG_DIRECT_CHANNEL_GRALLOC 0x800
++#endif
+ #endif
+ 
+ namespace {
+-- 
+2.56.0
+

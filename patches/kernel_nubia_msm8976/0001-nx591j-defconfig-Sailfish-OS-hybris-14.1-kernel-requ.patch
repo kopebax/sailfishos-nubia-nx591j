@@ -1,0 +1,82 @@
+From 00cd8c85f0b986ee5dc4a55d23bec2f151c2e1c4 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 15:39:27 +0100
+Subject: [PATCH 1/6] nx591j: defconfig: Sailfish OS (hybris-14.1) kernel
+ requirements
+
+---
+ arch/arm64/configs/lineageos_nx591j_defconfig | 33 +++++++++++++++----
+ 1 file changed, 26 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/configs/lineageos_nx591j_defconfig b/arch/arm64/configs/lineageos_nx591j_defconfig
+index 14a57f89..d21b566a 100644
+--- a/arch/arm64/configs/lineageos_nx591j_defconfig
++++ b/arch/arm64/configs/lineageos_nx591j_defconfig
+@@ -11,10 +11,6 @@ CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_SCHED_HMP=y
+-CONFIG_NAMESPACES=y
+-# CONFIG_UTS_NS is not set
+-# CONFIG_IPC_NS is not set
+-# CONFIG_PID_NS is not set
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_RELAY=y
+@@ -242,7 +238,6 @@ CONFIG_DM_CRYPT=y
+ CONFIG_DM_REQ_CRYPT=y
+ CONFIG_DM_VERITY=y
+ CONFIG_NETDEVICES=y
+-CONFIG_DUMMY=y
+ CONFIG_MII=y
+ CONFIG_TUN=y
+ CONFIG_MSM_RMNET_BAM=y
+@@ -284,7 +279,6 @@ CONFIG_SENSORS_MC3430=y
+ CONFIG_SENSORS_ISL29044A=y
+ CONFIG_SENSORS_CAPELLA_CM36283=y
+ # CONFIG_SERIO_I8042 is not set
+-# CONFIG_VT is not set
+ CONFIG_SERIAL_MSM_SMD=y
+ CONFIG_DIAG_CHAR=y
+ CONFIG_HW_RANDOM=y
+@@ -538,7 +532,6 @@ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_SECURITY=y
+ CONFIG_FUSE_FS=y
+ CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+@@ -660,3 +653,29 @@ CONFIG_IOSCHED_BFQ=y
+ CONFIG_CGROUP_BFQIO=y
+ CONFIG_DEFAULT_NOOP=y
+ 
++# Sailfish OS (hybris-14.1) – wymagania mer_verify_kernel_config
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_FHANDLE=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_QUOTA=y
++CONFIG_QUOTACTL=y
++CONFIG_QUOTA_NETLINK_INTERFACE=y
++CONFIG_QFMT_V2=y
++CONFIG_UTS_NS=y
++CONFIG_VT=y
++# CONFIG_DUMMY is not set
++CONFIG_AUTOFS4_FS=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CGROUP_PERF=y
++CONFIG_MEMCG=y
++CONFIG_IPC_NS=y
++CONFIG_PID_NS=y
++CONFIG_NET_NS=y
++CONFIG_NAMESPACES=y
++CONFIG_CHECKPOINT_RESTORE=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++# CONFIG_ANDROID_PARANOID_NETWORK is not set
+-- 
+2.56.0
+

@@ -1,0 +1,26 @@
+From 4cb144bb80494e3fdb550f678769432fe9fb00ba Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 20:42:35 +0100
+Subject: [PATCH 4/6] nx591j: defconfig: disable eMMC CMDQ
+ (mmc_blk_cmdq_issue_rq BUG under heavy I/O)
+
+---
+ arch/arm64/configs/lineageos_nx591j_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/lineageos_nx591j_defconfig b/arch/arm64/configs/lineageos_nx591j_defconfig
+index a2cf5d57..b13b8ecb 100644
+--- a/arch/arm64/configs/lineageos_nx591j_defconfig
++++ b/arch/arm64/configs/lineageos_nx591j_defconfig
+@@ -432,7 +432,7 @@ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_MSM=y
+-CONFIG_MMC_CQ_HCI=y
++# CONFIG_MMC_CQ_HCI is not set
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_SWITCH=y
+ CONFIG_EDAC=y
+-- 
+2.56.0
+

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="hs" fetch="https://github.com/HighwayStar" />
+  <project name="android_device_nubia_nx591j" path="device/nubia/nx591j" remote="hs" revision="cm-14.1" />
+  <project name="android_device_nubia_msm8976-common" path="device/nubia/msm8976-common" remote="hs" revision="cm-14.1" />
+  <project name="android_kernel_nubia_msm8976" path="kernel/nubia/msm8976" remote="hs" revision="staging/cm-14.1-nx591j" clone-depth="1" />
+  <project name="android_vendor_nubia" path="vendor/nubia" remote="hs" revision="cm-14.1" />
+</manifest>

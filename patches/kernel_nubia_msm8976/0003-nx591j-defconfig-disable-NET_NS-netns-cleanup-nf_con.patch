@@ -1,0 +1,26 @@
+From e263a8ad3bdae06a53d32035a185c51cb784f230 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 19:52:39 +0100
+Subject: [PATCH 3/6] nx591j: defconfig: disable NET_NS (netns cleanup ->
+ nf_conntrack kmem_cache_destroy sysfs BUG on 3.10)
+
+---
+ arch/arm64/configs/lineageos_nx591j_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/lineageos_nx591j_defconfig b/arch/arm64/configs/lineageos_nx591j_defconfig
+index d21b566a..a2cf5d57 100644
+--- a/arch/arm64/configs/lineageos_nx591j_defconfig
++++ b/arch/arm64/configs/lineageos_nx591j_defconfig
+@@ -674,7 +674,7 @@ CONFIG_CGROUP_PERF=y
+ CONFIG_MEMCG=y
+ CONFIG_IPC_NS=y
+ CONFIG_PID_NS=y
+-CONFIG_NET_NS=y
++# CONFIG_NET_NS is not set
+ CONFIG_NAMESPACES=y
+ CONFIG_CHECKPOINT_RESTORE=y
+ CONFIG_WATCHDOG_NOWAYOUT=y
+-- 
+2.56.0
+

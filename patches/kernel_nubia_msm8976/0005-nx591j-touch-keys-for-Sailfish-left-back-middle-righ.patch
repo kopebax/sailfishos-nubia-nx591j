@@ -1,0 +1,26 @@
+From 7bf2dd5ac3c59fef5d20e17141b0a82b773dd12a Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 21:42:11 +0100
+Subject: [PATCH 5/6] nx591j: touch keys for Sailfish (left=back,
+ middle/right=home)
+
+---
+ arch/arm/boot/dts/nubia/NX591/touch.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/nubia/NX591/touch.dtsi b/arch/arm/boot/dts/nubia/NX591/touch.dtsi
+index 9ba5da9c..8bf99118 100644
+--- a/arch/arm/boot/dts/nubia/NX591/touch.dtsi
++++ b/arch/arm/boot/dts/nubia/NX591/touch.dtsi
+@@ -68,7 +68,7 @@
+                 synaptics,key2maxcap = <190>;
+ 
+                 synaptics,lcd-reset-gpio = <&msm_gpio 25 0x0>;
+-                synaptics,cap-button-codes = <172 139 158>;
++                synaptics,cap-button-codes = <172 158 172>; /* Sailfish: lewy=wstecz, srodkowy i prawy=ekran glowny */
+                 pinctrl-names = "synaptics_pin_active", "synaptics_pin_suspend";
+                 pinctrl-0 = <&synaptics_int_active &synaptics_reset_active &synaptics_power_active>;
+                 pinctrl-1 = <&synaptics_int_suspend &synaptics_reset_suspend &synaptics_power_suspend>;
+-- 
+2.56.0
+

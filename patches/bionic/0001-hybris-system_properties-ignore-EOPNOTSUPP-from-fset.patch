@@ -1,0 +1,37 @@
+From 151dde76d928d1219ddeeae53d629b6d8b6aab29 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 18:32:16 +0100
+Subject: [PATCH] (hybris) system_properties: ignore EOPNOTSUPP from fsetxattr
+ when SELinux is disabled
+
+Change-Id: Ia5db223336e4fc872e7d388686fed5942c9a52d9
+---
+ libc/bionic/system_properties.cpp | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/libc/bionic/system_properties.cpp b/libc/bionic/system_properties.cpp
+index 9da5955..e78a1a0 100644
+--- a/libc/bionic/system_properties.cpp
++++ b/libc/bionic/system_properties.cpp
+@@ -240,6 +240,7 @@ static prop_area* map_prop_area_rw(const char* filename, const char* context,
+ 
+     if (context) {
+         if (fsetxattr(fd, XATTR_NAME_SELINUX, context, strlen(context) + 1, 0) != 0) {
++            const int fsetxattr_errno = errno;
+             __libc_format_log(ANDROID_LOG_ERROR, "libc",
+                               "fsetxattr failed to set context (%s) for \"%s\"", context, filename);
+             /*
+@@ -251,7 +252,9 @@ static prop_area* map_prop_area_rw(const char* filename, const char* context,
+              * Otherwise, the tester will ignore it and continue, albeit without any selinux
+              * property separation.
+              */
+-            if (fsetxattr_failed) {
++            /* (hybris) with SELinux disabled (selinux=0) the kernel rejects
++             * security.* xattrs with EOPNOTSUPP - that is not an error here */
++            if (fsetxattr_failed && fsetxattr_errno != EOPNOTSUPP) {
+                 *fsetxattr_failed = true;
+             }
+         }
+-- 
+2.56.0
+

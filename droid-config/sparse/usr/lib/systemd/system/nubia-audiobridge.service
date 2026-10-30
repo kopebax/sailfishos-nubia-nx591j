@@ -1,0 +1,14 @@
+[Unit]
+Description=Mostek audio PulseAudio <-> 32-bitowy HAL audio (nx591j)
+After=droid-hal-init.service
+Requires=droid-hal-init.service
+
+[Service]
+ExecStartPre=/bin/sh -c 'mkdir -p /run/nubia-audio && chgrp audio /run/nubia-audio && chmod 0770 /run/nubia-audio && { [ -p /run/nubia-audio/fifo ] || mkfifo /run/nubia-audio/fifo; } && chgrp audio /run/nubia-audio/fifo && chmod 0660 /run/nubia-audio/fifo'
+# FIFO mikrofonu (mic) tworzy PulseAudio (module-pipe-source nie wczytuje się z cudzym FIFO)
+ExecStart=/usr/libexec/droid-hybris/system/bin/nubia-audiobridge /run/nubia-audio/fifo /run/nubia-audio/mic
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+From 017a6ed21cd3d507aba65353789b74b660308620 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 16:08:06 +0100
+Subject: [PATCH] droidmediabuffer: layerCount only on Android >= 8
+
+Change-Id: I7e8d94e37ff992f7334befdbdfc808b551ce9bf8
+---
+ droidmediabuffer.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/droidmediabuffer.cpp b/droidmediabuffer.cpp
+index 1f3d697..c1f0d54 100644
+--- a/droidmediabuffer.cpp
++++ b/droidmediabuffer.cpp
+@@ -48,7 +48,9 @@ _DroidMediaBuffer::_DroidMediaBuffer(DroidMediaBufferItem& buffer,
+     format = buffer.mGraphicBuffer->format;
+     usage  = buffer.mGraphicBuffer->usage;
+     handle = buffer.mGraphicBuffer->handle;
++#if ANDROID_MAJOR >= 8
+     layerCount = 1;
++#endif
+ 
+     common.incRef = incRef;
+     common.decRef = decRef;
+@@ -70,7 +72,9 @@ _DroidMediaBuffer::_DroidMediaBuffer(android::sp<android::GraphicBuffer>& buffer
+     format = m_buffer->format;
+     usage  = m_buffer->usage;
+     handle = m_buffer->handle;
++#if ANDROID_MAJOR >= 8
+     layerCount = 1;
++#endif
+ 
+     common.incRef = incRef;
+     common.decRef = decRef;
+-- 
+2.56.0
+

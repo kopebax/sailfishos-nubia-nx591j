@@ -1,0 +1,7 @@
+### nx591j: zamiast module-droid-card (64-bitowy HAL Nubii nie działa) dźwięk idzie przez
+### FIFO do/z 32-bitowego mostka nubia-audiobridge.service. Właściwości droid.* są potrzebne,
+### bo polityka (xpolicy.conf) wybiera urządzenia po nich, a nie po nazwie.
+load-module module-pipe-sink file=/run/nubia-audio/fifo sink_name=sink.primary_output format=s16le rate=48000 channels=2 sink_properties='device.description="Głośnik" droid.output.primary=true droid.output.media_latency=true droid.output.low_latency=true'
+### kilka właściwości naraz w source_properties nie wczytuje się – reszta przez update-source-proplist
+load-module module-pipe-source file=/run/nubia-audio/mic source_name=source.primary_input format=s16le rate=48000 channels=2 source_properties=droid.input.builtin=true
+update-source-proplist source.primary_input droid.input.external=true device.description=Mikrofon

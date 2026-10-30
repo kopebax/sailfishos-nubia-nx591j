@@ -1,0 +1,43 @@
+From 15d9c96ee424b0a77581a8c3d6bc08333e5f9a7a Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 15:40:10 +0100
+Subject: [PATCH 1/2] msm8976-common: Sailfish OS (hybris-14.1): no forced
+ encryption, add /misc, selinux=0
+
+---
+ BoardConfigCommon.mk | 2 +-
+ rootdir/fstab.qcom   | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/BoardConfigCommon.mk b/BoardConfigCommon.mk
+index d2dd108..7eaf07d 100644
+--- a/BoardConfigCommon.mk
++++ b/BoardConfigCommon.mk
+@@ -48,7 +48,7 @@ TARGET_KEYMASTER_WAIT_FOR_QSEE := true
+ 
+ # Kernel
+ BOARD_KERNEL_BASE := 0x80000000
+-BOARD_KERNEL_CMDLINE := console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 androidboot.bootdevice=7824900.sdhci lpm_levels.sleep_disabled=1 earlyprintk
++BOARD_KERNEL_CMDLINE := console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 androidboot.bootdevice=7824900.sdhci lpm_levels.sleep_disabled=1 earlyprintk selinux=0 audit=0
+ BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
+ BOARD_KERNEL_OFFSET = 0x00008000
+ BOARD_KERNEL_PAGESIZE := 2048
+diff --git a/rootdir/fstab.qcom b/rootdir/fstab.qcom
+index 67f98d1..ef2024e 100644
+--- a/rootdir/fstab.qcom
++++ b/rootdir/fstab.qcom
+@@ -6,9 +6,10 @@
+ #<src>                                      <mnt_point>         <type>  <mnt_flags and options>                                                                 <fs_mgr_flags>
+ /dev/block/bootdevice/by-name/boot          /boot               emmc    defaults                                                                                recoveryonly
+ /dev/block/bootdevice/by-name/recovery      /recovery           emmc    defaults                                                                                recoveryonly
++/dev/block/bootdevice/by-name/misc          /misc               emmc    defaults                                                                                defaults
+ 
+ /dev/block/bootdevice/by-name/system                        /system      ext4    ro,barrier=1                                                             wait
+-/dev/block/bootdevice/by-name/userdata                      /data        ext4    nosuid,nodev,barrier=1,noauto_da_alloc                                   wait,check,formattable,forceencrypt=footer,length=-16384
++/dev/block/bootdevice/by-name/userdata                      /data        ext4    nosuid,nodev,barrier=1,noauto_da_alloc                                   wait,check,formattable,encryptable=footer,length=-16384
+ /dev/block/bootdevice/by-name/config                        /frp         emmc    defaults                                                                 defaults
+ /dev/block/bootdevice/by-name/cache                         /cache       ext4    rw,noatime,nosuid,nodev,barrier=1,data=ordered                           wait,check,formattable
+ 
+-- 
+2.56.0
+

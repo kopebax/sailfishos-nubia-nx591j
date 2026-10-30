@@ -1,0 +1,53 @@
+From 5ff306aa3fcc0b3b73b93f8607bb7c2d37afe493 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 01:12:00 +0100
+Subject: [PATCH 6/6] netfilter: conntrack: unique per-netns slab names (%pK
+ collided under kptr_restrict); re-enable NET_NS
+
+---
+ arch/arm64/configs/lineageos_nx591j_defconfig | 2 +-
+ net/netfilter/nf_conntrack_core.c             | 8 +++++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/configs/lineageos_nx591j_defconfig b/arch/arm64/configs/lineageos_nx591j_defconfig
+index b13b8ecb..8a5ca346 100644
+--- a/arch/arm64/configs/lineageos_nx591j_defconfig
++++ b/arch/arm64/configs/lineageos_nx591j_defconfig
+@@ -674,7 +674,7 @@ CONFIG_CGROUP_PERF=y
+ CONFIG_MEMCG=y
+ CONFIG_IPC_NS=y
+ CONFIG_PID_NS=y
+-# CONFIG_NET_NS is not set
++CONFIG_NET_NS=y
+ CONFIG_NAMESPACES=y
+ CONFIG_CHECKPOINT_RESTORE=y
+ CONFIG_WATCHDOG_NOWAYOUT=y
+diff --git a/net/netfilter/nf_conntrack_core.c b/net/netfilter/nf_conntrack_core.c
+index 65758cd2..778006a4 100644
+--- a/net/netfilter/nf_conntrack_core.c
++++ b/net/netfilter/nf_conntrack_core.c
+@@ -1643,6 +1643,8 @@ void nf_conntrack_init_end(void)
+ #define DYING_NULLS_VAL		((1<<30)+1)
+ #define TEMPLATE_NULLS_VAL	((1<<30)+2)
+ 
++static atomic_t nf_conntrack_slab_id = ATOMIC_INIT(0);
++
+ int nf_conntrack_init_net(struct net *net)
+ {
+ 	int ret;
+@@ -1657,7 +1659,11 @@ int nf_conntrack_init_net(struct net *net)
+ 		goto err_stat;
+ 	}
+ 
+-	net->ct.slabname = kasprintf(GFP_KERNEL, "nf_conntrack_%pK", net);
++	/* %pK prints zeros once kptr_restrict is set, so every new netns got the same
++	 * slab name and destroying one of them hit BUG() in sysfs_remove_one().
++	 * Use a counter: unique names without exposing kernel pointers. */
++	net->ct.slabname = kasprintf(GFP_KERNEL, "nf_conntrack_%u",
++				     (unsigned int)atomic_inc_return(&nf_conntrack_slab_id));
+ 	if (!net->ct.slabname) {
+ 		ret = -ENOMEM;
+ 		goto err_slabname;
+-- 
+2.56.0
+

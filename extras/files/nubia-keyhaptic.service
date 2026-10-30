@@ -1,0 +1,11 @@
+[Unit]
+Description=Wibracja przy przyciskach pod ekranem (nx591j)
+After=systemd-udev-settle.service
+
+[Service]
+ExecStart=/usr/bin/python3 -I /usr/local/bin/nubia-keyhaptic.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

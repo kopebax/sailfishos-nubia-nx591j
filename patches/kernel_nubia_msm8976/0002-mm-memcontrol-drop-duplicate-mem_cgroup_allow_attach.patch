@@ -1,0 +1,41 @@
+From fc171a43ba92e294ac0a6539c09b0ca7553b212f Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 15:46:58 +0100
+Subject: [PATCH 2/6] mm: memcontrol: drop duplicate mem_cgroup_allow_attach
+ (breaks CONFIG_MEMCG=y)
+
+---
+ mm/memcontrol.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/mm/memcontrol.c b/mm/memcontrol.c
+index a19c7213..460218dc 100644
+--- a/mm/memcontrol.c
++++ b/mm/memcontrol.c
+@@ -6985,23 +6985,6 @@ static void mem_cgroup_move_task(struct cgroup *cont,
+ }
+ #endif
+ 
+-static int mem_cgroup_allow_attach(struct cgroup *cgrp,
+-				 struct cgroup_taskset *tset)
+-{
+-	const struct cred *cred = current_cred(), *tcred;
+-	struct task_struct *task;
+-
+-	cgroup_taskset_for_each(task, cgrp, tset) {
+-		tcred = __task_cred(task);
+-
+-		if ((current != task) && !capable(CAP_SYS_ADMIN) &&
+-		    cred->euid != tcred->uid && cred->euid != tcred->suid)
+-			return -EACCES;
+-	}
+-
+-	return 0;
+-}
+-
+ /*
+  * Cgroup retains root cgroups across [un]mount cycles making it necessary
+  * to verify sane_behavior flag on each mount attempt.
+-- 
+2.56.0
+

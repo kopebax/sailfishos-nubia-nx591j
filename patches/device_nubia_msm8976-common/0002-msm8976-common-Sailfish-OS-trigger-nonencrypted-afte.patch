@@ -1,0 +1,42 @@
+From 1ac62a151e63e286c913a606fd2ec289bab02e39 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 01:41:17 +0100
+Subject: [PATCH 2/2] msm8976-common: Sailfish OS: trigger nonencrypted after
+ mount_all, leave USB to usb_moded
+
+---
+ rootdir/init.qcom.rc   | 3 ++-
+ rootdir/init.target.rc | 3 +++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/rootdir/init.qcom.rc b/rootdir/init.qcom.rc
+index 2833011..da3aab7 100644
+--- a/rootdir/init.qcom.rc
++++ b/rootdir/init.qcom.rc
+@@ -25,7 +25,8 @@
+ # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #
+ 
+-import init.qcom.usb.rc
++# Sailfish OS: USB gadget is managed by usb_moded
++# import init.qcom.usb.rc
+ import init.target.rc
+ import init.qcom.factory.rc
+ 
+diff --git a/rootdir/init.target.rc b/rootdir/init.target.rc
+index 3201618..5b683b3 100644
+--- a/rootdir/init.target.rc
++++ b/rootdir/init.target.rc
+@@ -40,6 +40,9 @@ on early-init
+ on fs
+     wait /dev/block/bootdevice
+     mount_all fstab.qcom
++    # Sailfish OS: droid-hal removes fstab.* and systemd mounts the partitions,
++    # so mount_all fails; still start class main / late_start like a non-encrypted boot
++    trigger nonencrypted
+     write /proc/sys/vm/swappiness 100
+ 
+     # Keeping following partitions outside fstab file. As user may not have
+-- 
+2.56.0
+

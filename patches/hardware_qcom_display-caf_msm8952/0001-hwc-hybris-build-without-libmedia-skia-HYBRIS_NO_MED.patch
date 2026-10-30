@@ -1,0 +1,132 @@
+From 2ed320ec1206da6191daa3cfc4e7d41ff5e9ad67 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Thu, 29 Oct 2026 20:17:37 +0100
+Subject: [PATCH] hwc: hybris build without libmedia/skia (HYBRIS_NO_MEDIA)
+
+Change-Id: If55a84fd9cab5790001a422a494368c8ee67ec6b
+---
+ libhwcomposer/Android.mk          | 5 ++---
+ libhwcomposer/hwc_dump_layers.cpp | 4 ++--
+ libhwcomposer/hwc_qclient.cpp     | 6 ++++++
+ libhwcomposer/hwc_qclient.h       | 6 ++++++
+ 4 files changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/libhwcomposer/Android.mk b/libhwcomposer/Android.mk
+index 845e5de..50ec132 100644
+--- a/libhwcomposer/Android.mk
++++ b/libhwcomposer/Android.mk
+@@ -18,13 +18,12 @@ endif
+ LOCAL_SHARED_LIBRARIES        := $(common_libs) libEGL liboverlay \
+                                  libhdmi libqdutils libhardware_legacy \
+                                  libdl libmemalloc libqservice libsync \
+-                                 libbinder libmedia
++                                 libbinder
+ 
+-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\" -Wno-absolute-value \
++LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdhwcomposer\" -DHYBRIS_NO_MEDIA -Wno-absolute-value \
+                                  -Wno-float-conversion -Wno-unused-parameter
+ 
+ ifeq ($(TARGET_USES_QCOM_BSP),true)
+-LOCAL_SHARED_LIBRARIES += libskia
+ ifeq ($(GET_FRAMEBUFFER_FORMAT_FROM_HWC),true)
+     LOCAL_CFLAGS += -DGET_FRAMEBUFFER_FORMAT_FROM_HWC
+ endif
+diff --git a/libhwcomposer/hwc_dump_layers.cpp b/libhwcomposer/hwc_dump_layers.cpp
+index 7f88612..d1f8d4d 100644
+--- a/libhwcomposer/hwc_dump_layers.cpp
++++ b/libhwcomposer/hwc_dump_layers.cpp
+@@ -36,7 +36,7 @@
+ #include <cutils/log.h>
+ #include <sys/stat.h>
+ #include <comptype.h>
+-#ifdef QTI_BSP
++#if defined(QTI_BSP) && !defined(HYBRIS_NO_MEDIA)
+ // Ignore W(float)conversion errors for external headers
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wconversion"
+@@ -315,7 +315,7 @@ void HwcDebug::dumpLayer(size_t layerIndex, hwc_layer_1_t hwLayers[])
+     }
+ 
+     getHalPixelFormatStr(hnd->format, pixFormatStr, sizeof(pixFormatStr));
+-#ifdef QTI_BSP
++#if defined(QTI_BSP) && !defined(HYBRIS_NO_MEDIA)
+     if (needDumpPng && hnd->base) {
+         bool bResult = false;
+         char dumpFilename[PATH_MAX];
+diff --git a/libhwcomposer/hwc_qclient.cpp b/libhwcomposer/hwc_qclient.cpp
+index 67be167..34016d0 100644
+--- a/libhwcomposer/hwc_qclient.cpp
++++ b/libhwcomposer/hwc_qclient.cpp
+@@ -54,7 +54,9 @@ namespace qClient {
+ 
+ // ----------------------------------------------------------------------------
+ QClient::QClient(hwc_context_t *ctx) : mHwcContext(ctx),
++#ifndef HYBRIS_NO_MEDIA
+         mMPDeathNotifier(new MPDeathNotifier(ctx)),
++#endif
+         mCamDeathNotifier(new CamDeathNotifier())
+ {
+     ALOGD_IF(QCLIENT_DEBUG, "QClient Constructor invoked");
+@@ -68,7 +70,9 @@ QClient::~QClient()
+ static void securing(hwc_context_t *ctx, uint32_t startEnd) {
+     //The only way to make this class in this process subscribe to media
+     //player's death.
++#ifndef HYBRIS_NO_MEDIA
+     IMediaDeathNotifier::getMediaPlayerService();
++#endif
+ 
+     ctx->mDrawLock.lock();
+     ctx->mSecuring = startEnd;
+@@ -93,6 +97,7 @@ static void unsecuring(hwc_context_t *ctx, uint32_t startEnd) {
+         ctx->proc->invalidate(ctx->proc);
+ }
+ 
++#ifndef HYBRIS_NO_MEDIA
+ void QClient::MPDeathNotifier::died() {
+     mHwcContext->mDrawLock.lock();
+     ALOGD_IF(QCLIENT_DEBUG, "Media Player died");
+@@ -102,6 +107,7 @@ void QClient::MPDeathNotifier::died() {
+     if(mHwcContext->proc)
+         mHwcContext->proc->invalidate(mHwcContext->proc);
+ }
++#endif
+ 
+ static android::status_t screenRefresh(hwc_context_t *ctx) {
+     status_t result = NO_INIT;
+diff --git a/libhwcomposer/hwc_qclient.h b/libhwcomposer/hwc_qclient.h
+index c1371f5..76f0e8d 100644
+--- a/libhwcomposer/hwc_qclient.h
++++ b/libhwcomposer/hwc_qclient.h
+@@ -35,7 +35,9 @@
+ #include <cutils/log.h>
+ #include <utils/RefBase.h>
+ #include <binder/IServiceManager.h>
++#ifndef HYBRIS_NO_MEDIA
+ #include <media/IMediaDeathNotifier.h>
++#endif
+ #include <IQClient.h>
+ 
+ struct hwc_context_t;
+@@ -60,6 +62,7 @@ public:
+     };
+ 
+ private:
++#ifndef HYBRIS_NO_MEDIA
+     //Notifies of Media Player death
+     class MPDeathNotifier : public android::IMediaDeathNotifier {
+     public:
+@@ -68,8 +71,11 @@ private:
+         hwc_context_t *mHwcContext;
+     };
+ 
++#endif
+     hwc_context_t *mHwcContext;
++#ifndef HYBRIS_NO_MEDIA
+     const android::sp<android::IMediaDeathNotifier> mMPDeathNotifier;
++#endif
+     const android::sp<QClient::CamDeathNotifier>  mCamDeathNotifier;
+ };
+ }; // namespace qClient
+-- 
+2.56.0
+

@@ -1,0 +1,2 @@
+# Android 7 (hybris-14.1) nie używa binder RIL; binder.conf koliduje z ofono-configs-binder
+/etc/ofono/binder.conf
