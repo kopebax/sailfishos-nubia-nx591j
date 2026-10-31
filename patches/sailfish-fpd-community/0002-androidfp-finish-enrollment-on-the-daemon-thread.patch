@@ -1,0 +1,77 @@
+From 49eb4e81ce82be3a00b0730e098c692bf93781a8 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 09:13:42 +0100
+Subject: [PATCH 2/2] androidfp: finish enrollment on the daemon thread
+
+The callbacks run on the HAL worker thread. The legacy FPC HAL waits in
+post_enroll for that thread to go idle, so calling it from the enroll
+callback deadlocked the daemon at the end of every enrollment.
+---
+ src/androidfp.cpp | 21 +++++++++++++++------
+ src/androidfp.h   |  4 ++++
+ 2 files changed, 19 insertions(+), 6 deletions(-)
+
+diff --git a/src/androidfp.cpp b/src/androidfp.cpp
+index 95a9de3..59733c5 100644
+--- a/src/androidfp.cpp
++++ b/src/androidfp.cpp
+@@ -2,6 +2,7 @@
+ #include "util/property_store.h"
+ 
+ #include <QDebug>
++#include <QMetaObject>
+ 
+ #include <limits.h>
+ #include <cstring>
+@@ -174,12 +175,20 @@ void AndroidFP::enrollCallback(uint32_t finger, uint32_t remaining)
+         emit enrollProgress(pc);
+     } else {
+         emit enrollProgress(1);
+-        UHardwareBiometryRequestStatus ret = u_hardware_biometry_postEnroll(m_biometry);
+-        if (ret == SYS_OK) {
+-            succeeded(finger);
+-        } else {
+-            failed(QString::fromUtf8(IntToStringRequestStatus(ret).data()));
+-        }
++        // Called on the HAL worker thread: legacy HALs (FPC on Android 7) wait
++        // for that thread to go idle in post_enroll, so finish on our thread.
++        m_enrolledFinger = finger;
++        QMetaObject::invokeMethod(this, "finishEnroll", Qt::QueuedConnection);
++    }
++}
++
++void AndroidFP::finishEnroll()
++{
++    UHardwareBiometryRequestStatus ret = u_hardware_biometry_postEnroll(m_biometry);
++    if (ret == SYS_OK) {
++        succeeded(m_enrolledFinger);
++    } else {
++        failed(QString::fromUtf8(IntToStringRequestStatus(ret).data()));
+     }
+ }
+ 
+diff --git a/src/androidfp.h b/src/androidfp.h
+index c1b1042..86c2e35 100644
+--- a/src/androidfp.h
++++ b/src/androidfp.h
+@@ -32,6 +32,9 @@ signals:
+     void acquired(int info);
+     void enumerated(); // fingerprint list ready
+ 
++private slots:
++    void finishEnroll();
++
+ private:
+     void enumerateCallback(uint32_t finger, uint32_t remaining);
+     void enrollCallback(uint32_t finger, uint32_t remaining);
+@@ -51,6 +54,7 @@ private:
+ 
+     float m_enrollRemaining = 0.0;
+     uint32_t m_removingFinger = 0;
++    uint32_t m_enrolledFinger = 0;
+     QList<uint32_t> m_fingers;
+ };
+ 
+-- 
+2.56.0
+

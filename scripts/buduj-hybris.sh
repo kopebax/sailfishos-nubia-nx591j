@@ -12,6 +12,7 @@ lunch lineage_nx591j-userdebug
 make -j6 hybris-hal libdroidmedia minimediaservice minisfservice libminisf \
     libaudioflingerglue libaudioflingerglue_32 miniafservice \
     hwcomposer.msm8952 gralloc.msm8952 copybit.msm8952 memtrack.msm8952 \
-    nubia-audiobridge nubia-audiotest nubia-audiorec
+    nubia-audiobridge nubia-audiotest nubia-audiorec \
+    gps.msm8952 libloc_eng libloc_core libgps.utils libbiometry_fp_api
 ls -la out/target/product/nx591j/hybris-*.img
 '

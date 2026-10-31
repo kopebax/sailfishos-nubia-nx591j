@@ -16,6 +16,7 @@ declare -A TARGET=(
     [kernel_nubia_msm8976]=kernel/nubia/msm8976
     [sensorfw]=hybris/mw/sensorfw          # cloned by build_packages.sh --mw
     [libhybris]=hybris/mw/libhybris/libhybris
+    [sailfish-fpd-community]=hybris/mw/sailfish-fpd-community   # git clone, see README
 )
 
 for dir in "${!TARGET[@]}"; do

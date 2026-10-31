@@ -1,0 +1,12 @@
+[Unit]
+Description=Voice call audio routing for nubia-audiobridge (nx591j)
+After=nubia-audiobridge.service ofono.service
+Requires=nubia-audiobridge.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/nubia-callaudio.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

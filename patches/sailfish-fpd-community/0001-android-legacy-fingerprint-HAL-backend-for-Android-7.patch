@@ -1,0 +1,258 @@
+From 1b5aaeb42eed6978223515f93520d4e40bfbfa15 Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 03:48:26 +0100
+Subject: [PATCH 1/2] android: legacy fingerprint HAL backend for Android 7
+ (pre-HIDL)
+
+libbiometry_fp_api on top of hardware/fingerprint.h via hw_get_module(),
+without fingerprintd or binder. Handles module API 2.0 HALs (old
+enumerate(dev, ids, &n) signature, e.g. FPC on the Nubia NX591J) and 2.1.
+No hardware gatekeeper on these devices, so enroll() gets an unsigned
+auth token; the lock code is checked by sailfish-devicelock-fpd.
+---
+ android/hybris/Android.mk                     |   9 +-
+ .../hybris/biometry_fp_legacy_for_hybris.cpp  | 198 ++++++++++++++++++
+ 2 files changed, 203 insertions(+), 4 deletions(-)
+ create mode 100644 android/hybris/biometry_fp_legacy_for_hybris.cpp
+
+diff --git a/android/hybris/Android.mk b/android/hybris/Android.mk
+index b663188..bec81ac 100644
+--- a/android/hybris/Android.mk
++++ b/android/hybris/Android.mk
+@@ -38,24 +38,25 @@ ifeq ($(IS_ANDROID_8),true)
+ LOCAL_SRC_FILES += \
+     biometry_fp_hidl_for_hybris.cpp
+ else
+-$(error "Android pre oreo not supported")
++LOCAL_SRC_FILES += \
++    biometry_fp_legacy_for_hybris.cpp
+ endif
+ 
+ LOCAL_MODULE := libbiometry_fp_api
+ LOCAL_MODULE_TAGS := optional
+ 
+ LOCAL_SHARED_LIBRARIES := \
+-	libbinder \
+ 	libcutils \
+-	libinput \
+ 	liblog \
+ 	libutils \
+ 	libhardware \
+-	libhardware_legacy \
+ 	libdl
+ 
+ ifeq ($(IS_ANDROID_8),true)
+ LOCAL_SHARED_LIBRARIES += \
++    libbinder \
++    libinput \
++    libhardware_legacy \
+     libhidlbase \
+     libhidltransport \
+     libsensor \
+diff --git a/android/hybris/biometry_fp_legacy_for_hybris.cpp b/android/hybris/biometry_fp_legacy_for_hybris.cpp
+new file mode 100644
+index 0000000..59496d9
+--- /dev/null
++++ b/android/hybris/biometry_fp_legacy_for_hybris.cpp
+@@ -0,0 +1,198 @@
++/*
++ * libbiometry_fp_api for Android 7 (pre-HIDL) devices: talks to the
++ * legacy fingerprint HAL (hardware/fingerprint.h) directly with
++ * hw_get_module(), no fingerprintd/binder involved.
++ *
++ * There is no gatekeeper HAL on these devices (Android 7 used the software
++ * gatekeeper), so enroll() gets an unsigned auth token like fingerprintd's;
++ * the lock code is checked by sailfish-devicelock-fpd before enrolling.
++ *
++ * Module API 2.0 HALs (e.g. FPC on the Nubia NX591J) have the old
++ * enumerate(dev, results, &max_size) signature; 2.1 HALs report the
++ * templates through the notify callback.
++ *
++ * SPDX-License-Identifier: LGPL-3.0-only
++ */
++
++#include <biometry.h>
++
++#include <hardware/hardware.h>
++#include <hardware/fingerprint.h>
++#include <hardware/hw_auth_token.h>
++#include <string.h>
++#include <utils/Log.h>
++
++#undef LOG_TAG
++#define LOG_TAG "biometry_fp_legacy"
++
++struct UHardwareBiometry_ {
++    fingerprint_device_t *dev = nullptr;
++};
++
++static UHardwareBiometryParams g_cb;
++static bool g_have_cb;
++
++static uint64_t device_id(fingerprint_device_t *dev)
++{
++    return reinterpret_cast<uint64_t>(dev);
++}
++
++static fingerprint_device_t *g_dev;
++
++static void hal_notify(const fingerprint_msg_t *msg)
++{
++    if (!g_have_cb)
++        return;
++    uint64_t id = device_id(g_dev);
++    void *ctx = g_cb.context;
++
++    switch (msg->type) {
++    case FINGERPRINT_ERROR:
++        if (g_cb.error_cb) {
++            int e = msg->data.error;
++            if (e >= FINGERPRINT_ERROR_VENDOR_BASE)
++                g_cb.error_cb(id, ERROR_VENDOR, e - FINGERPRINT_ERROR_VENDOR_BASE, ctx);
++            else
++                g_cb.error_cb(id, e, 0, ctx);
++        }
++        break;
++    case FINGERPRINT_ACQUIRED:
++        if (g_cb.acquired_cb) {
++            int a = msg->data.acquired.acquired_info;
++            if (a >= FINGERPRINT_ACQUIRED_VENDOR_BASE)
++                g_cb.acquired_cb(id, ACQUIRED_VENDOR, a - FINGERPRINT_ACQUIRED_VENDOR_BASE, ctx);
++            else
++                g_cb.acquired_cb(id, a, 0, ctx);
++        }
++        break;
++    case FINGERPRINT_TEMPLATE_ENROLLING:
++        if (g_cb.enrollresult_cb)
++            g_cb.enrollresult_cb(id, msg->data.enroll.finger.fid, msg->data.enroll.finger.gid,
++                                 msg->data.enroll.samples_remaining, ctx);
++        break;
++    case FINGERPRINT_TEMPLATE_REMOVED:
++        if (g_cb.removed_cb)
++            g_cb.removed_cb(id, msg->data.removed.finger.fid, msg->data.removed.finger.gid, 0, ctx);
++        break;
++    case FINGERPRINT_AUTHENTICATED:
++        // fid 0 means "not recognised", as with the HIDL HAL
++        if (g_cb.authenticated_cb)
++            g_cb.authenticated_cb(id, msg->data.authenticated.finger.fid,
++                                  msg->data.authenticated.finger.gid, ctx);
++        break;
++    case FINGERPRINT_TEMPLATE_ENUMERATING:
++        if (g_cb.enumerate_cb)
++            g_cb.enumerate_cb(id, msg->data.enumerated.finger.fid, msg->data.enumerated.finger.gid,
++                              msg->data.enumerated.remaining_templates, ctx);
++        break;
++    }
++}
++
++static UHardwareBiometryRequestStatus to_status(int rc)
++{
++    return rc >= 0 ? SYS_OK : rc;
++}
++
++UHardwareBiometry u_hardware_biometry_new()
++{
++    const hw_module_t *module = nullptr;
++    hw_device_t *hwdev = nullptr;
++
++    if (hw_get_module(FINGERPRINT_HARDWARE_MODULE_ID, &module) != 0) {
++        ALOGE("no fingerprint HAL");
++        return nullptr;
++    }
++    if (module->methods->open(module, nullptr, &hwdev) != 0 || !hwdev) {
++        ALOGE("cannot open fingerprint HAL");
++        return nullptr;
++    }
++    UHardwareBiometry self = new UHardwareBiometry_;
++    self->dev = reinterpret_cast<fingerprint_device_t *>(hwdev);
++    g_dev = self->dev;
++    ALOGI("opened %s, version 0x%x", module->name, hwdev->version);
++    return self;
++}
++
++uint64_t u_hardware_biometry_setNotify(UHardwareBiometry self, UHardwareBiometryParams *params)
++{
++    if (!self || !params)
++        return 0;
++    g_cb = *params;
++    g_have_cb = true;
++    self->dev->set_notify(self->dev, hal_notify);
++    return device_id(self->dev);
++}
++
++uint64_t u_hardware_biometry_preEnroll(UHardwareBiometry self)
++{
++    return self ? self->dev->pre_enroll(self->dev) : 0;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_enroll(UHardwareBiometry self, uint32_t gid,
++                                                          uint32_t timeoutSec, uint32_t uid)
++{
++    if (!self)
++        return SYS_EINVAL;
++    hw_auth_token_t hat;
++    memset(&hat, 0, sizeof(hat));
++    hat.version = HW_AUTH_TOKEN_VERSION;
++    hat.challenge = self->dev->pre_enroll(self->dev);
++    hat.user_id = uid;
++    hat.authenticator_type = __builtin_bswap32(HW_AUTH_PASSWORD);
++    return to_status(self->dev->enroll(self->dev, &hat, gid, timeoutSec));
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_postEnroll(UHardwareBiometry self)
++{
++    return self ? to_status(self->dev->post_enroll(self->dev)) : SYS_EINVAL;
++}
++
++uint64_t u_hardware_biometry_getAuthenticatorId(UHardwareBiometry self)
++{
++    return self ? self->dev->get_authenticator_id(self->dev) : 0;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_cancel(UHardwareBiometry self)
++{
++    return self ? to_status(self->dev->cancel(self->dev)) : SYS_EINVAL;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_enumerate(UHardwareBiometry self)
++{
++    if (!self)
++        return SYS_EINVAL;
++    if (self->dev->common.version >= FINGERPRINT_MODULE_API_VERSION_2_1)
++        return to_status(self->dev->enumerate(self->dev));
++
++    typedef int (*enumerate_20_t)(fingerprint_device_t *, fingerprint_finger_id_t *, uint32_t *);
++    fingerprint_finger_id_t ids[32];
++    uint32_t n = 32;
++    int rc = reinterpret_cast<enumerate_20_t>(self->dev->enumerate)(self->dev, ids, &n);
++    if (rc < 0)
++        return rc;
++    if (g_have_cb && g_cb.enumerate_cb) {
++        uint64_t id = device_id(self->dev);
++        if (n == 0)
++            g_cb.enumerate_cb(id, 0, 0, 0, g_cb.context);
++        for (uint32_t i = 0; i < n; i++)
++            g_cb.enumerate_cb(id, ids[i].fid, ids[i].gid, n - i - 1, g_cb.context);
++    }
++    return SYS_OK;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_remove(UHardwareBiometry self, uint32_t gid, uint32_t fid)
++{
++    return self ? to_status(self->dev->remove(self->dev, gid, fid)) : SYS_EINVAL;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_setActiveGroup(UHardwareBiometry self, uint32_t gid,
++                                                                  char *storePath)
++{
++    return self ? to_status(self->dev->set_active_group(self->dev, gid, storePath)) : SYS_EINVAL;
++}
++
++UHardwareBiometryRequestStatus u_hardware_biometry_authenticate(UHardwareBiometry self, uint64_t operationId,
++                                                                uint32_t gid)
++{
++    return self ? to_status(self->dev->authenticate(self->dev, operationId, gid)) : SYS_EINVAL;
++}
+-- 
+2.56.0
+

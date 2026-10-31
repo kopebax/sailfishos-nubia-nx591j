@@ -1,2 +1,5 @@
 # Android 7 (hybris-14.1) nie używa binder RIL; binder.conf koliduje z ofono-configs-binder
 /etc/ofono/binder.conf
+# The bluez5 template adds SupplementaryGroups=uhid (Android 8+ bluetooth HAL). Android 7
+# has no uhid group and bluetoothd fails with status=216/GROUP.
+/usr/lib/systemd/system/bluetooth.service.d/uhid.conf

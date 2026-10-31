@@ -1,0 +1,10 @@
+#!/bin/sh
+# Pure Maps on the NX591J: MapLibre crashes the Adreno 510 driver under
+# libhybris when zooming (vertex buffer bindings lost with VAOs). Hide the VAO
+# entry points (libnovao) and render on the GUI thread. The Sailfish
+# customcontext scene graph calls VAO functions unchecked, so use the default
+# Qt Quick one here.
+export LD_PRELOAD=/usr/lib64/libnovao.so${LD_PRELOAD:+:$LD_PRELOAD}
+export QSG_RENDER_LOOP=basic
+unset QMLSCENE_DEVICE
+exec /usr/bin/harbour-pure-maps "$@"

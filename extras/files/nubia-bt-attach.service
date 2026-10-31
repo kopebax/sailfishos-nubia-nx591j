@@ -1,0 +1,14 @@
+[Unit]
+Description=Bluetooth HCI over SMD with the stored BD address (nx591j)
+Before=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 -I /usr/local/bin/nubia-bt-attach.py
+StandardOutput=kmsg
+StandardError=kmsg
+
+[Install]
+WantedBy=multi-user.target

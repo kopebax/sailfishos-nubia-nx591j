@@ -22,7 +22,7 @@ Community port of [Sailfish OS](https://sailfishos.org) 5.1 to the **ZTE Nubia Z
 
 ## Hardware status
 
-Sailfish OS 5.1.0.11 aarch64, hybris-14.1. Last checked 2026-10-30.
+Sailfish OS 5.1.0.11 aarch64, hybris-14.1. Last checked 2026-10-31.
 
 | Area | Status | Notes |
 |---|---|---|
@@ -32,20 +32,22 @@ Sailfish OS 5.1.0.11 aarch64, hybris-14.1. Last checked 2026-10-30.
 | Capacitive keys | ✅ | left = back, middle/right = home; haptics via `nubia-keyhaptic` |
 | Brightness | ✅ | |
 | Vibration / haptics | ✅ | effect lengths raised (motor ignores pulses < ~40 ms) |
+| Battery level, charging | ✅ | needs the `[features]` list in the csd hw-settings |
+| Screen rotation | ✅ | sensorfwd waits for the sensors daemon socket |
+| Sensors | ✅ | accelerometer, magnetometer, gyroscope, light, proximity |
 | Wi-Fi | ✅ | built-in Pronto driver started by `wlan-pronto-start.service` |
 | Browser incl. video (YouTube) | ✅ | needs `mediacodec` / `mediaextractor` services |
-| Speaker audio | ✅ | 32-bit audio bridge, see [Porting notes](#audio) |
-| Microphone | ✅ | same bridge, capture direction |
+| Speaker audio, microphone | ✅ | 32-bit audio bridge, see [Porting notes](#audio) |
+| Wired headphones (USB-C) | ✅ | |
 | Volume keys | ✅ | |
-| Sensors | ✅ | accelerometer, magnetometer, gyroscope (sensorfw patched for Android 7) |
+| Bluetooth | ✅ | `hci_smd` kernel driver + `nubia-bt-attach`; A2DP speakers via `nubia-bt-a2dp-fix` |
+| Calls | ✅ | earpiece, speaker, mute (`nubia-callaudio` + audio bridge); Bluetooth HFP untested |
+| SMS, mobile data | ✅ | ofono legacy RIL plugin (socket RIL), dual SIM |
+| GPS | ✅ | XTRA via the location service: Settings → Location → "Enable extra online based assistance" |
+| Fingerprint | ✅ | `sailfish-fpd-community` with a legacy (Android 7) HAL backend, no Gatekeeper |
+| Pure Maps (Chum) | ✅ | MapLibre needs `libnovao` (wrapper installed by `nx591j-extras`) |
 | Camera | ⚠️ | app starts; preview slow, capture fails (`Camera2Client: notifyError`), video recording hangs |
-| Wired headphones (USB-C analog adapter) | ❓ | untested; the bridge switches routes via the "Headset Jack" input device |
-| Bluetooth | ❌ | kernel lacks `hci_smd` (BlueZ ↔ WCN3680 SMD); `bluetooth.service` also needs group `uhid` |
-| Fingerprint | ❌ | not investigated (did not work on LineageOS 14.1 either) |
 | Rear camera colour | ⚠️ | on LineageOS the default rear camera is the monochrome sensor |
-| Calls, SMS, mobile data | ❓ | untested (no SIM); RIL is up (`rild`, `ofonod`) |
-| GPS | ❓ | untested |
-| Earpiece routing in calls | ❓ | untested; the audio bridge only handles media routes yet |
 
 ## Installing
 
@@ -128,6 +130,9 @@ docker run --rm -v ~/hadk:/src los14-build bash -c '
   cd /src
   repo init -u https://github.com/mer-hybris/android -b hybris-14.1 --depth=1
   repo sync -c -j8 --no-tags --no-clone-bundle'
+# fingerprint daemon + its Android side (libbiometry_fp_api), patched for the legacy HAL
+git clone https://github.com/piggz/sailfish-fpd-community ~/hadk/hybris/mw/sailfish-fpd-community
+git -C ~/hadk/hybris/mw/sailfish-fpd-community checkout 5f50846
 scripts/apply-patches.sh ~/hadk        # everything except sensorfw (see step 2)
 ```
 
@@ -139,7 +144,8 @@ lunch lineage_nx591j-userdebug
 make -j6 hybris-hal libdroidmedia minimediaservice minisfservice libminisf \
     libaudioflingerglue libaudioflingerglue_32 miniafservice \
     hwcomposer.msm8952 gralloc.msm8952 copybit.msm8952 memtrack.msm8952 \
-    nubia-audiobridge nubia-audiotest nubia-audiorec
+    nubia-audiobridge nubia-audiotest nubia-audiorec \
+    gps.msm8952 libloc_eng libloc_core libgps.utils libbiometry_fp_api
 ```
 
 Notes:
@@ -163,15 +169,33 @@ cp -r droid-hal/* $ANDROID_ROOT/rpm/                       # + git submodule dhd
 cp -r droid-config/* $ANDROID_ROOT/hybris/droid-configs/   # + submodule droid-configs-device
 cp -r droid-hal-version/* $ANDROID_ROOT/hybris/droid-hal-version-nx591j/
 
+# fingerprint: moves libbiometry_fp_api out of out/ (before --droid-hal, or both
+# droid-hal and droid-biometry-fp would ship it)
+hybris/mw/sailfish-fpd-community/rpm/copy-hal.sh
+rpm/dhd/helpers/build_packages.sh -o --build=hybris/mw/sailfish-fpd-community --spec=rpm/droid-biometry-fp.spec
+rpm/dhd/helpers/build_packages.sh -o --build=hybris/mw/sailfish-fpd-community --spec=rpm/sailfish-fpd-community.spec
 rpm/dhd/helpers/build_packages.sh --droid-hal
 rpm/dhd/helpers/build_packages.sh --configs
 rpm/dhd/helpers/build_packages.sh --mw        # clones middleware, sensorfw fails here:
 scripts/apply-patches.sh $ANDROID_ROOT        #   apply sensorfw + libhybris patches, then
 rpm/dhd/helpers/build_packages.sh -o --mw     #   rebuild offline (keeps the patches)
 rpm/dhd/helpers/build_packages.sh -o --gg
+cp -r android/miniaf $ANDROID_ROOT/hybris/droid-miniaf-nx591j   # 32-bit miniafservice
+rpm/dhd/helpers/build_packages.sh -o --build=hybris/droid-miniaf-nx591j --spec=rpm/droid-miniaf-nx591j.spec
+cp -r extras $ANDROID_ROOT/hybris/nx591j-extras
+rpm/dhd/helpers/build_packages.sh -o --build=hybris/nx591j-extras --spec=rpm/nx591j-extras.spec
 rpm/dhd/helpers/build_packages.sh -o --version
-# extras: build extras/rpm/nx591j-extras.spec with mb2 and add it to the local repo
-RELEASE=5.1.0.11 EXTRA_NAME=-nx591j1 rpm/dhd/helpers/build_packages.sh -o --mic
+```
+
+`scripts/pakiety-sfos.sh` runs these stages in the SDK container
+(`OFFLINE=1 scripts/pakiety-sfos.sh fpd droid-hal miniaf configs extras version`).
+
+The image is built by `scripts/obraz-sfos.sh` instead of `build_packages.sh --mic`: same
+kickstart plus the [Chum](https://github.com/sailfishos-chum) repository, with Chum GUI
+and Pure Maps preinstalled and the Chum repo kept enabled (`ssu ar`) on the device:
+
+```sh
+scripts/obraz-sfos.sh -nx591j1     # -> SailfishOScommunity-release-5.1.0.11-nx591j-nx591j1/*.zip
 ```
 
 ### 3. Installation zip
@@ -290,8 +314,42 @@ Never rebind the codec at runtime to retry: it leaves stale DAPM pointers and pa
 * **droidmedia** sets `layerCount`, which exists only on Android ≥ 8.
 * **droid-configs** template ships `/etc/ofono/binder.conf`, which conflicts with
   `ofono-configs-binder` → removed via `delete_file.list`.
-* `syscall 293` (rseq) and other ENOSYS messages in dmesg are noise: kernel 3.10 lacks
-  rseq/memfd/etc. and glibc falls back.
+* **Unimplemented syscalls** (clone3, close_range, rseq…) made the kernel dump registers
+  for every process (`do_ni_syscall`) → `pr_debug` only, as in mainline.
+* **memfd:** localsearch restarted its extractor every second and PulseAudio complained
+  ("Could not create memfd"): kernel 3.10 has no `memfd_create` → backported from 3.17
+  (atomic `i_mmap_writable`, file sealing, syscall 279 / compat 385).
+* **Battery indicator, rotation:** without a `[features]` section (lower case, keys like
+  `Battery`, `GSensor`, values `1`) in the csd hw-settings, ssu-sysinfo reports only
+  Suspend/Reboot → lipstick hides the battery and sensorfwd disables the accelerometer.
+  sensorfwd also started together with `sensors.qcom` and opened the sensors HAL before
+  `/dev/socket/sensor_ctl_socket` existed → it now waits for the socket.
+* **Bluetooth:** WCN3680 BT runs over SMD → `hci_smd` from CAF msm-3.10 plus a `setup`
+  hook that programs the BD address from `/persist/bluetooth/.bt_nv.bin` (NVM tag 2).
+  The bluez5 template adds `SupplementaryGroups=uhid`, which Android 7 lacks.
+  Speakers that are also an A2DP source open their stream to *our* sink endpoint
+  → `nubia-bt-a2dp-fix` connects the a2dp-sink profile instead.
+* **Telephony:** hybris init only reads `/usr/libexec/droid-hybris/system/etc/init`, so the
+  main `ril-daemon` (`rild.rc`) never started. Android 7 needs the socket RIL plugin
+  (`ofono-ril-plugin`, `ril_subscription.conf`) – without `sub=SUBx` (libril 7 misreads the
+  header) and with `startTimeout=90000` (qcril restarts once at boot). Dual SIM devices
+  need `AutoSelectDataSim` or mobile data can't be enabled.
+* **Call audio:** with the audio bridge nothing sets `AUDIO_MODE_IN_CALL`; the msm8952 HAL
+  (voice_extn) also only starts the voice path after `vsid=<VOICEMMODE1/2>;call_state=2`,
+  normally sent by the Android dialer → `nubia-callaudio` watches ofono and the
+  voicecall UI and drives the bridge.
+* **GPS:** the HAL disabled its XTRA interface because the native XTRA client 2.0
+  (libizat_core) exists – but it only runs in `system_server` → HAL patch; the location
+  service downloads and injects XTRA (`/etc/gps_xtra.ini`). The active location settings
+  are in `/var/lib/location/location.conf`.
+* **ipacm** crashed every few seconds: it reads `/etc/IPACM_cfg.xml` → symlink to
+  `/system/etc`.
+* **Fingerprint:** FPC1020 with a fingerprint HAL API 2.0 (pre-HIDL). Enrollment hung
+  at 100 %: the FPC `post_enroll` waits for its own worker thread, from which fpd called it.
+* **MapLibre (Pure Maps)** crashes the Adreno 510 driver under libhybris when zooming
+  (vertex buffer bindings recorded in VAOs get lost) → `libnovao` hides the VAO entry
+  points, plus `QSG_RENDER_LOOP=basic` and no `customcontext` (it calls VAO functions
+  unchecked).
 
 ### Debugging tips
 
@@ -310,12 +368,14 @@ Never rebind the codec at runtime to retry: it leaves stale DAPM pointers and pa
 ```
 manifest/            local manifest for the hybris-14.1 tree (device, common tree, kernel, vendor)
 patches/<project>/   patches for bionic, system/core, hybris-boot, libhybris, display-caf,
-                     droidmedia, sensorfw, msm8976-common and the kernel
+                     droidmedia, sensorfw, sailfish-fpd-community, msm8976-common, kernel
 droid-hal/           droid-hal-nx591j.spec (dhd as submodule)
 droid-config/        droid-config-nx591j (spec, patterns, sparse/ with all runtime fixes)
 droid-hal-version/   droid-hal-version-nx591j.spec
 android/nubia-audio/ 32-bit audio bridge (PulseAudio <-> Android audio HAL) + test tools
-extras/              nx591j-extras: TLS fix (libtlspad), haptics for the capacitive keys
+android/miniaf/      droid-miniaf-nx591j: 32-bit miniafservice (dropped by droid-hal)
+extras/              nx591j-extras: TLS fix (libtlspad), key haptics, Bluetooth attach and
+                     A2DP fix, call audio, libnovao + Pure Maps launcher
 scripts/             build container, build/flash/diagnostic helpers, OTA zip signing
 ```
 

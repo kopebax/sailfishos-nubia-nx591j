@@ -1,0 +1,40 @@
+From b3f0336593beafc244ba9d7a00c2c430287ab70a Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 23:25:47 +0100
+Subject: [PATCH] gps: keep the legacy XTRA interface without system_server
+
+The native XTRA client 2.0 in libizat_core only runs inside Android's
+system_server. On Sailfish OS its mere presence made loc_eng_xtra_init()
+refuse the XTRA interface, so no assistance data was ever downloaded and
+cold starts took minutes. Always offer the interface; the location service
+downloads and injects the data itself.
+
+Developed with the assistance of Claude (Anthropic).
+---
+ gps/loc_api/libloc_api_50001/loc_eng_xtra.cpp | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/gps/loc_api/libloc_api_50001/loc_eng_xtra.cpp b/gps/loc_api/libloc_api_50001/loc_eng_xtra.cpp
+index d334e0a..aa8f504 100644
+--- a/gps/loc_api/libloc_api_50001/loc_eng_xtra.cpp
++++ b/gps/loc_api/libloc_api_50001/loc_eng_xtra.cpp
+@@ -124,12 +124,10 @@ int loc_eng_xtra_init (loc_eng_data_s_type &loc_eng_data,
+     loc_eng_xtra_data_s_type *xtra_module_data_ptr;
+     ENTRY_LOG();
+ 
+-    if(!loc_eng_data.adapter->mSupportsTimeInjection
+-       || loc_eng_data.adapter->hasNativeXtraClient()) {
+-        LOC_LOGD("XTRA is already supported. disable it here.\n");
+-        EXIT_LOG(%d, 1); // return 1 denote failure
+-        return 1;
+-    }
++    // The native XTRA client 2.0 (libizat_core) and the LBS services that
++    // would otherwise handle XTRA only run inside Android's system_server.
++    // Without them (e.g. on Sailfish OS) always offer the legacy XTRA
++    // interface so the location service can download and inject XTRA data.
+ 
+     if(callbacks == NULL) {
+         LOC_LOGE("loc_eng_xtra_init: failed, cb is NULL");
+-- 
+2.56.0
+

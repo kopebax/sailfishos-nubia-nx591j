@@ -1,5 +1,7 @@
 // nubia-audiobridge: 32-bitowy mostek PulseAudio <-> HAL audio Nubii przez FIFO:
 // odtwarzanie (module-pipe-sink -> HAL) i nagrywanie (HAL -> module-pipe-source).
+// Rozmowy: polecenia w FIFO sterującym (call 1|2 / normal / speaker 0|1 / mute 0|1) przełączają
+// HAL w tryb IN_CALL, ustawiają trasę głównego wyjścia i stan sesji głosowej karty SIM.
 // Na NX591J działa tylko 32-bitowy HAL/ACDB (Android 7 uruchamiał 32-bitowy audioserver),
 // a PulseAudio w porcie Sailfisha jest 64-bitowy. Format: s16le, 48 kHz, stereo.
 #include <hardware/audio.h>
@@ -11,6 +13,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
+#include <atomic>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +51,22 @@ static audio_devices_t output_device() {
     }
     closedir(dir);
     return dev;
+}
+
+// Rozmowa: 0 = brak, inaczej urządzenie wyjściowe dla głosu (słuchawka rozmów / głośnik / słuchawki).
+static std::atomic<audio_devices_t> g_call_route{0};
+static std::atomic<bool> g_speaker{false};
+
+static audio_devices_t call_device() {
+    audio_devices_t dev = output_device();
+    if (dev != AUDIO_DEVICE_OUT_SPEAKER) return dev;
+    return g_speaker ? AUDIO_DEVICE_OUT_SPEAKER : AUDIO_DEVICE_OUT_EARPIECE;
+}
+
+// Urządzenie dla odtwarzania: w czasie rozmowy to samo, co dla głosu.
+static audio_devices_t current_device() {
+    audio_devices_t call = g_call_route;
+    return call ? call : output_device();
 }
 
 static void set_route(audio_stream_out_t *out, audio_devices_t dev) {
@@ -114,9 +133,65 @@ static void *mic_thread(void *arg) {
     return nullptr;
 }
 
+// Sterowanie rozmową: jedna komenda na linię w FIFO (pisze je nubia-callaudio).
+struct CtlArgs { audio_hw_device_t *dev; audio_stream_out_t *out; const char *fifo; };
+
+// HAL z wieloma sesjami głosowymi (voice_extn) zestawia rozmowę dopiero po call_state=2 dla
+// sesji danej karty – na Androidzie wysyła to aplikacja telefonu. Dual SIM DSDS: VOICEMMODE1/2.
+static const unsigned kVsid[] = { 0x11C05000, 0x11DC5000 };
+
+static void set_call_state(audio_hw_device_t *dev, int sim, int call_state) {
+    char kv[48];
+    snprintf(kv, sizeof kv, "vsid=%u;call_state=%d", kVsid[sim], call_state);
+    dev->set_parameters(dev, kv);
+}
+
+static void *ctl_thread(void *arg) {
+    CtlArgs *a = static_cast<CtlArgs *>(arg);
+    char line[64];
+    int sim = 0;
+    while (!g_stop) {
+        FILE *f = fopen(a->fifo, "r+");
+        if (!f) { sleep(1); continue; }
+        while (!g_stop && fgets(line, sizeof line, f)) {
+            line[strcspn(line, "\r\n")] = 0;
+            if (!strncmp(line, "call", 4)) {
+                sim = line[4] == ' ' && line[5] == '2' ? 1 : 0;
+                a->dev->set_mode(a->dev, AUDIO_MODE_IN_CALL);
+                g_call_route = call_device();
+                set_route(a->out, g_call_route);
+                set_call_state(a->dev, sim, 2);   // CALL_ACTIVE
+                a->dev->set_voice_volume(a->dev, 1.0f);
+            } else if (!strcmp(line, "normal")) {
+                if (g_call_route) set_call_state(a->dev, sim, 1);   // CALL_INACTIVE
+                g_call_route = 0;
+                g_speaker = false;
+                a->dev->set_mode(a->dev, AUDIO_MODE_NORMAL);
+                a->dev->set_mic_mute(a->dev, false);
+                set_route(a->out, output_device());
+            } else if (!strncmp(line, "speaker ", 8)) {
+                g_speaker = line[8] == '1';
+                if (g_call_route) {
+                    g_call_route = call_device();
+                    set_route(a->out, g_call_route);
+                }
+            } else if (!strncmp(line, "mute ", 5)) {
+                a->dev->set_mic_mute(a->dev, line[5] == '1');
+            } else {
+                fprintf(stderr, "nieznane polecenie: %s\n", line);
+                continue;
+            }
+            fprintf(stderr, "polecenie: %s (trasa 0x%x)\n", line, (unsigned)g_call_route.load());
+        }
+        fclose(f);
+    }
+    return nullptr;
+}
+
 int main(int argc, char **argv) {
     const char *fifo = argc > 1 ? argv[1] : "/run/nubia-audio/fifo";
     const char *mic_fifo = argc > 2 ? argv[2] : "/run/nubia-audio/mic";
+    const char *ctl_fifo = argc > 3 ? argv[3] : "/run/nubia-audio/ctl";
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
     signal(SIGPIPE, SIG_IGN);
@@ -148,6 +223,10 @@ int main(int argc, char **argv) {
     char *buf = static_cast<char *>(malloc(chunk));
     fprintf(stderr, "HAL gotowy: bufor %zu B, wyjście 0x%x, FIFO %s\n", chunk, route, fifo);
 
+    CtlArgs ctl_args = { dev, out, ctl_fifo };
+    pthread_t ctl;
+    pthread_create(&ctl, nullptr, ctl_thread, &ctl_args);
+
     bool active = false;
     while (!g_stop) {
         // otwarcie z O_RDWR: FIFO nie dostaje EOF, gdy PulseAudio się zrestartuje
@@ -172,7 +251,7 @@ int main(int argc, char **argv) {
             fill += n;
             if (fill < chunk) continue;
             if (!active) {                       // wybudzenie: sprawdź słuchawki
-                audio_devices_t now = output_device();
+                audio_devices_t now = current_device();
                 if (now != route) { route = now; set_route(out, route); }
                 active = true;
             }

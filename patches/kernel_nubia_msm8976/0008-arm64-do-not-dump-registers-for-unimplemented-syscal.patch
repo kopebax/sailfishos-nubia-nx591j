@@ -1,0 +1,42 @@
+From cfcde6a5e3e441061f303a7852da2fcfc9f52d4c Mon Sep 17 00:00:00 2001
+From: kopebax <kopebax@users.noreply.github.com>
+Date: Fri, 30 Oct 2026 03:29:08 +0100
+Subject: [PATCH 8/9] arm64: do not dump registers for unimplemented syscalls
+
+glibc 2.3x in Sailfish OS 5.1 probes syscalls this 3.10 kernel does not
+have (clone3, close_range, memfd_create, rseq, ...) and falls back when it
+gets ENOSYS. do_ni_syscall() printed the instruction and a full register
+dump for each of them, so every process start/exit filled dmesg.
+Keep a pr_debug() line only, as mainline does.
+---
+ arch/arm64/kernel/traps.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 2198961ebad..844f14c9717 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -394,13 +394,13 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+ 	}
+ #endif
+ 
+-	if (show_unhandled_signals && printk_ratelimit()) {
+-		pr_info("%s[%d]: syscall %d\n", current->comm,
+-			task_pid_nr(current), (int)regs->syscallno);
+-		dump_instr("", regs);
+-		if (user_mode(regs))
+-			__show_regs(regs);
+-	}
++	/*
++	 * No register dump: current glibc probes newer syscalls (clone3,
++	 * close_range, rseq, ...) and falls back on ENOSYS, which flooded
++	 * the log on this 3.10 kernel. Mainline dropped the dump as well.
++	 */
++	pr_debug("%s[%d]: syscall %d\n", current->comm,
++		 task_pid_nr(current), (int)regs->syscallno);
+ 
+ 	return sys_ni_syscall();
+ }
+-- 
+2.56.0
+

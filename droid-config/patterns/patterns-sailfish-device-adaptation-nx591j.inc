@@ -5,6 +5,8 @@
 Summary: Jolla HW Adaptation nx591j
 Requires: droid-hal-nx591j
 Requires: nx591j-extras
+# miniafservice (CameraService waits for media.audio_flinger), see android/miniaf
+Requires: droid-miniaf-nx591j
 Requires: droid-hal-nx591j-img-boot
 Requires: droid-hal-nx591j-kernel-modules
 Requires: droid-config-nx591j-sailfish
@@ -60,13 +62,18 @@ Requires: usb-moded
 Requires: rfkill
 
 # enable device lock and allow to select untrusted software
-Requires: jolla-devicelock-daemon-encsfa
+# Fingerprint (FPC1020, legacy HAL 2.0): device lock with fpd support
+Requires: sailfish-devicelock-fpd
+Requires: sailfish-fpd-community
 
 # Enable home encryption
 #Requires: sailfish-device-encryption
 
 # For GPS
 Requires: geoclue-provider-hybris
+
+# Android 7 RIL uses sockets, not binder (ril_subscription.conf in droid-config)
+Requires: ofono-ril-plugin
 
 # For FM radio on some QCOM devices
 #Requires: qt5-qtmultimedia-plugin-mediaservice-irisradio

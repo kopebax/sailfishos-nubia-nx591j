@@ -1,0 +1,12 @@
+[Unit]
+Description=Switch A2DP speakers from source to sink role
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/nubia-bt-a2dp-fix.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=bluetooth.service
