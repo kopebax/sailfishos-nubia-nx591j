@@ -1,5 +1,5 @@
 Name:       nx591j-extras
-Version:    1.1
+Version:    1.2
 Release:    1
 Summary:    Nubia Z17 Lite (nx591j) runtime fixes for Sailfish OS
 License:    BSD-3-Clause

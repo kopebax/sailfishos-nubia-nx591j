@@ -86,11 +86,23 @@ fastboot reboot
 
 `userdata` must be unencrypted ext4 (LineageOS encrypts it on first boot).
 
+The stock LineageOS recovery cannot install the image: with SELinux enforcing the hybris
+updater gets `Permission denied` on `/data` ("Failed to extract filesystem!"), and it
+cannot find `/misc`. Make a permissive recovery with `/misc` and flash it:
+
+```sh
+scripts/recovery-sfos.sh recovery.img recovery-sfos.img
+fastboot oem nubia_unlock NUBIA_NX591J
+fastboot flash recovery recovery-sfos.img
+```
+
 **Recovery:** *Factory reset → Format data*, then *Apply update → Apply from ADB*:
 
 ```sh
-adb sideload sailfishos-nx591j-release-5.1.0.11-nx591j1-signed.zip
+adb sideload sailfishos-nx591j-release-5.1.0.11-nx591j3-signed.zip
 ```
+
+The first boot takes a few minutes (one-time setup) before the setup wizard appears.
 
 **Or fastboot:** build an ext4 userdata image with the rootfs extracted to
 `/.stowaways/sailfishos` and flash it together with `hybris-boot.img`. Use `mke2fs` with
@@ -376,7 +388,8 @@ android/nubia-audio/ 32-bit audio bridge (PulseAudio <-> Android audio HAL) + te
 android/miniaf/      droid-miniaf-nx591j: 32-bit miniafservice (dropped by droid-hal)
 extras/              nx591j-extras: TLS fix (libtlspad), key haptics, Bluetooth attach and
                      A2DP fix, call audio, libnovao + Pure Maps launcher
-scripts/             build container, build/flash/diagnostic helpers, OTA zip signing
+scripts/             build container, build/flash/diagnostic helpers, OTA zip signing,
+                     recovery-sfos.sh (LineageOS recovery able to install Sailfish OS)
 ```
 
 The kernel with all Sailfish OS changes is kept as a separate repository

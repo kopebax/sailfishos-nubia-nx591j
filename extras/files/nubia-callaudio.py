@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 
 CTL_FIFO = '/run/nubia-audio/ctl'
 SESSION_BUS = 'unix:path=/run/user/100000/dbus/user_bus_socket'
@@ -73,10 +74,14 @@ def update_call():
 
 
 def watch(cmd, handler):
-    mon = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
-    for line in mon.stdout:
-        handler(line)
-    return mon.wait()
+    # The service starts before the user session: retry until the bus exists.
+    while True:
+        mon = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               universal_newlines=True)
+        for line in mon.stdout:
+            handler(line)
+        log('%s exited (%d), restarting' % (cmd[0], mon.wait()))
+        time.sleep(5)
 
 
 def on_ofono(line):
